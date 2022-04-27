@@ -23,7 +23,7 @@ mod default_path {
 
     pub fn config_file() -> Option<String> {
         #[cfg(target_os = "windows")]
-        let cf = make_path_from_home("auth.conf"); // TODO: change name
+        let cf = make_path_from_home("auth.conf");
         #[cfg(not(target_os = "windows"))]
         let cf = String::from("/etc/adequate_auth/adequate_auth.conf");
         return Some(cf);
@@ -31,7 +31,7 @@ mod default_path {
 
     pub fn users_file() -> Option<String> {
         #[cfg(target_os = "windows")]
-        let uf = make_path_from_home("auth.users"); // TODO: change name
+        let uf = make_path_from_home("auth.users");
         #[cfg(not(target_os = "windows"))]
         let uf = String::from("/etc/adequate_auth/adequate_auth.users");
         return Some(uf);
@@ -87,11 +87,6 @@ pub struct UserConfig {
     #[clap(short = 'r', long)]
     pub log_rotation: Option<usize>,
 
-    /// Enable HTTPS
-    #[merge(strategy = merge_strategy::overwrite_option)]
-    #[clap(short, long)]
-    pub https: Option<bool>,
-
     /// Custom config file location
     #[serde(skip)]
     #[merge(strategy = merge_strategy::overwrite_option)]
@@ -112,7 +107,6 @@ impl Default for UserConfig {
             users_file: default_path::users_file(),
             log_dir: default_path::log_dir(),
             log_rotation: Some(5),
-            https: Some(false),
             config: default_path::config_file(), // only used for passing --config via cmdline args
             command: None,
         };

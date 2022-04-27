@@ -2,7 +2,10 @@ use serde::Deserialize;
 use tide::{Response, StatusCode};
 use tracing::info;
 
-use crate::{server::State, server::SESSION_ID};
+use crate::{
+    server::CSRF_ID,
+    server::{State, SESSION_ID},
+};
 
 #[derive(Deserialize)]
 struct LoginFormData {
@@ -17,7 +20,7 @@ impl Login {
     pub async fn get(req: tide::Request<State>) -> tide::Result {
         let mut resp = Response::builder(StatusCode::Ok);
         let state = req.state();
-        match req.cookie(SESSION_ID) {
+        match req.cookie(CSRF_ID) {
             Some(sess) => {
                 state.csrf_manager.renew(&String::from(sess.value()));
             }
@@ -83,4 +86,8 @@ impl AuthReqest {
         };
         return Ok(Response::new(status));
     }
+}
+
+mod tests {
+    // All tests in server.rs
 }

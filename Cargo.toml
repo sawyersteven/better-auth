@@ -21,3 +21,6 @@ bcrypt = "0.12.1"
 time = "0.2.25"
 tide = "0.16.0"
 async-std = { version = "1.11.0", features = ["attributes"] }
+
+[dev-dependencies]
+surf = "2.3.2"

@@ -8,7 +8,7 @@ use std::{
 use std::result::Result;
 
 use bcrypt::BcryptResult;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use crate::return_err_string;
 
@@ -102,10 +102,11 @@ impl UserManager {
             }
         };
         match file.write_all(line.as_str().as_bytes()) {
-            Ok(_) => {} // returning Ok(()) here makes rust angry for some reason...
+            Ok(_) => {
+                return Ok(());
+            }
             Err(e) => return_err_string!("{}", e),
         };
-        return Ok(());
     }
 
     fn validate_username(&self, username: &String) -> Result<(), String> {

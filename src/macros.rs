@@ -3,7 +3,7 @@
 macro_rules! return_err_string {
     ($($arg:tt)*) => {{
         let msg = format!($($arg)*);
-        error!("{}", msg);
+        tracing::error!("{}", msg);
         return Err(msg);
     }};
 }

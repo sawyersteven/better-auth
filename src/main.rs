@@ -12,7 +12,7 @@ mod user_manager;
 use config::UserConfig;
 use user_manager::UserManager;
 
-const APP_NAME: &str = "RustAuth";
+const APP_NAME: &str = "better-auth";
 
 #[async_std::main]
 async fn main() {
