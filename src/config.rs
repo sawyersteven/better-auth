@@ -1,12 +1,13 @@
 use std::{
     fs::{self},
-    ops::DerefMut,
     path::Path,
 };
 
-use clap::{Parser, Subcommand};
+use argh::FromArgs;
+//use clap::{Parser, Subcommand};
 use merge::Merge;
-use serde::{Deserialize, Serialize};
+use serde_lite::{Deserialize, Serialize};
+use serde_lite_derive::{Deserialize, Serialize};
 
 mod default_path {
     use crate::APP_NAME;
@@ -47,54 +48,65 @@ mod default_path {
 }
 
 mod merge_strategy {
-    // Overwrites existing Option<T> with donor Option<T> if donor's option contains a value
+    // Overwrites existing Option<T> with donor Option<T> if donor's option
+    // contains a value, regardless of the existing option
     pub fn overwrite_option<T>(existing: &mut Option<T>, donor: Option<T>) {
         if !donor.is_none() {
             *existing = donor;
         }
     }
 }
-#[derive(Debug, Parser, Merge, Serialize, Deserialize)]
-#[clap(author, version, about, long_about = None)]
+
+#[derive(Debug, Merge, Serialize, Deserialize, FromArgs)]
+/// A description
+// #[clap(author, version, about, long_about = None)]
 pub struct UserConfig {
-    /// Address at which to start server
+    /// address at which to start server
     #[merge(strategy = merge_strategy::overwrite_option)]
-    #[clap(short, long)]
+    // #[clap(short, long)]
+    #[argh(option)]
     pub address: Option<String>,
 
-    /// Port on which to listen
+    /// port on which to listen
     #[merge(strategy = merge_strategy::overwrite_option)]
-    #[clap(short, long)]
+    //// #[clap(short, long)]
+    #[argh(option)]
     pub port: Option<usize>,
 
-    /// Time in seconds for inactive sessions to expire
+    /// time in seconds for inactive sessions to expire
     #[merge(strategy = merge_strategy::overwrite_option)]
-    #[clap(short = 't', long)]
+    // #[clap(short = 't', long)]
+    #[argh(option)]
     pub session_timeout: Option<u64>,
 
-    /// Location of user/password file for this session
+    /// location of user/password file for this session
     #[merge(strategy = merge_strategy::overwrite_option)]
-    #[clap(short = 'u', long)]
+    // #[clap(short = 'u', long)]
+    #[argh(option)]
     pub users_file: Option<String>,
 
-    /// Directory in which to write logs
+    /// directory in which to write logs
     #[merge(strategy = merge_strategy::overwrite_option)]
-    #[clap(short, long)]
+    // #[clap(short, long)]
+    #[argh(option)]
     pub log_dir: Option<String>,
 
-    /// Number of days to keep old log files
+    /// number of days to keep old log files
     #[merge(strategy = merge_strategy::overwrite_option)]
-    #[clap(short = 'r', long)]
+    // #[clap(short = 'r', long)]
+    #[argh(option)]
     pub log_rotation: Option<usize>,
 
-    /// Custom config file location
+    /// custom config file location
     #[serde(skip)]
     #[merge(strategy = merge_strategy::overwrite_option)]
-    #[clap(short, long)]
+    // #[clap(short, long)]
+    #[argh(option)]
     pub config: Option<String>,
 
     #[serde(skip)]
-    #[clap(subcommand)]
+    // #[clap(subcommand)]
+    #[argh(subcommand)]
     pub command: Option<Command>,
 }
 
@@ -118,7 +130,7 @@ impl UserConfig {
     pub fn build() -> Self {
         let mut default_conf = UserConfig::default();
         // cmd line args parsed via clap
-        let args = UserConfig::parse();
+        let args: UserConfig = argh::from_env(); // = UserConfig::parse();
         let filepath: &str = args.config.as_deref().unwrap_or(default_conf.config.as_deref().unwrap());
 
         let deserialized = UserConfig::read_or_create(filepath);
@@ -141,7 +153,8 @@ impl UserConfig {
 
     pub fn serialize(config: &UserConfig, filepath: &str) {
         println!("Writing config file {filepath}");
-        let json = serde_json::to_string_pretty(config).expect("Error serializing user config");
+        let intermediate = config.serialize().unwrap();
+        let json = serde_json::to_string_pretty(&intermediate).unwrap();
 
         match Path::new(filepath).parent() {
             Some(dir) => match fs::create_dir_all(dir) {
@@ -166,20 +179,55 @@ impl UserConfig {
 
     pub fn deserialize_file(filepath: &str) -> Self {
         println!("Reading config from {filepath}");
-        let mut json_string = fs::read_to_string(filepath).expect(&*format!("Unable to read file: {}", filepath));
-        return serde_json::from_str(json_string.deref_mut()).expect(&*format!("Could not parse config file: {}", filepath));
+        let json_string = fs::read_to_string(filepath).expect(&*format!("Unable to read file: {}", filepath));
+        let intermediate = serde_json::from_str(json_string.as_str()).expect(&*format!("Malformed config file: {}", filepath));
+        return UserConfig::deserialize(&intermediate).expect(&*format!("Error parsing file: {}", filepath));
     }
 }
 
-#[derive(Debug, Subcommand, Serialize, Deserialize)]
+#[derive(Debug, FromArgs)]
+#[argh(subcommand)]
 pub enum Command {
-    /// Adds new user and password
-    AddUser {
-        /// Username to add
-        #[clap(long)]
-        username: String,
-        /// Password for username
-        #[clap(long)]
-        password: Option<String>,
-    },
+    AddUser(AddUser),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Add new user and password
+#[argh(subcommand, name = "adduser")]
+pub struct AddUser {
+    /// username to add
+    #[argh(option)]
+    pub username: String,
+
+    /// password for user
+    #[argh(option)]
+    pub password: Option<String>,
+}
+
+#[cfg(test)]
+pub mod tests {
+    use crate::test_utils::{make_tmp_dir, make_tmp_file};
+
+    use super::UserConfig;
+
+    static mut TEST_PORT: usize = 9000;
+
+    pub fn make_test_config() -> UserConfig {
+        let p: usize;
+        unsafe {
+            p = TEST_PORT;
+            TEST_PORT += 1;
+        }
+
+        return UserConfig {
+            address: Some(String::from("localhost")),
+            port: Some(p),
+            session_timeout: Some(3600),
+            users_file: Some(make_tmp_file().unwrap()),
+            log_dir: Some(make_tmp_dir().unwrap()),
+            log_rotation: Some(1),
+            config: None,
+            command: None,
+        };
+    }
 }

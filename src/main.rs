@@ -1,4 +1,3 @@
-extern crate clap;
 extern crate dirs;
 
 mod config;
@@ -23,15 +22,19 @@ async fn main() {
     );
 
     match user_config.command {
-        Some(config::Command::AddUser { username, password }) => {
-            let pw = password.unwrap_or(rpassword::prompt_password("Enter password for user: ").unwrap());
-            _ = UserManager::new(&user_config.users_file.as_ref().unwrap())
-                .unwrap()
-                .add_user(&username, &pw);
-            return;
-        }
+        Some(cmd) => match cmd {
+            config::Command::AddUser(opt) => {
+                let pw = opt
+                    .password
+                    .unwrap_or(rpassword::prompt_password("Enter password for user: ").unwrap());
+                _ = UserManager::new(&user_config.users_file.as_ref().unwrap())
+                    .unwrap()
+                    .add_user(&opt.username, &pw);
+                return;
+            }
+        },
         None => {
-            let s = server::start(&user_config);
+            let s = server::start(&user_config).unwrap();
             s.await.expect("Unable to start server");
         }
     }

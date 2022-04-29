@@ -22,16 +22,6 @@
             }
         }
 
-        function GetCSRF() {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const parts = cookies[i].trim().split('=');
-                if (parts[0] === 'adequateAuthCSRFToken') {
-                    return parts[1];
-                }
-            }
-        }
-
         function SendLogin(e) {
             e.preventDefault();
             const XHR = new XMLHttpRequest();
@@ -48,11 +38,7 @@
             };
 
             XHR.open('POST', '/login');
-            XHR.send(JSON.stringify({
-                "username": usernameInput.value,
-                "password": passwordInput.value,
-                "csrf_id": GetCSRF(),
-            }));
+            XHR.send(`${usernameInput.value}:${passwordInput.value}`); // see routes.rs
         }
     </script>
     <style>
@@ -61,7 +47,7 @@
         }
 
         body {
-            background: linear-gradient(0deg, #0F172A 0%, #334155 50%, #0F172A 100%);
+            background: #D4D4D4;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -72,11 +58,17 @@
             margin: 0;
         }
 
-        #bar {
-            width: 100vw;
+        #box {
+            width: 22em;
             background-color: #fff;
-            box-shadow: 0 0 1.5em rgba(0, 0, 0, 1.0);
-            padding: 2em 0;
+            padding: 0 2em 2em 2em;
+            margin: 0 auto;
+            border-radius: 0.5em;
+        }
+
+        #box img {
+            margin: 0 auto;
+            display: block;
         }
 
         .login_form {
@@ -90,9 +82,10 @@
             color: #000;
         }
 
-        input {
-            background-color: #CBD5E1;
-            border: 1px solid #94A3B8;
+        input,
+        button {
+            background-color: #D4D4D4;
+            border: none;
             width: 20em;
             height: 3em;
             padding: 0.5em;
@@ -100,28 +93,21 @@
             font-size: 1em;
             transition: 0.25s;
             outline: none;
-            border-radius: 0.2em;
+            border-radius: 0.1em;
             box-sizing: border-box;
+            margin: 1em 0;
         }
 
-        input[type="submit"] {
+        button {
             font-weight: bold;
-            text-transform: uppercase;
-            margin-top: 2em;
-        }
-
-        input:hover,
-        input:focus {
-            border: 1px solid #0F172A;
         }
 
         button:active,
         button:focus,
         button:hover {
-            color: #ECEFF1;
-            background: #263238;
-            border-color: #263238;
+            background: #06B6D4;
             outline: none;
+            cursor: pointer;
         }
 
         .warnBanner {
@@ -158,14 +144,12 @@
         <div id="expireWarn" class="hidden warnBanner">
             Session expired due to inactivity
         </div>
-        <div id="bar">
+        <div id="box">
+            <img src="logo.png" />
             <form class="login_form" onSubmit="SendLogin(event)">
-                <label>USERNAME</label>
-                <input id="username" type="text" required />
-                <label>PASSWORD</label>
-                <input id="password" type="password" required />
-                <input id="csrftoken" type="hidden" value="{{.csrftoken}}" />
-                <input type="submit" />
+                <input id="username" type="text" placeholder="username" required />
+                <input id="password" type="password" placeholder="password" required />
+                <button type="submit" cursor="pointer"> Submit</button>
             </form>
         </div>
     </div>
