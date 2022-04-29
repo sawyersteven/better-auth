@@ -88,36 +88,43 @@ impl AuthReqest {
 
 #[cfg(test)]
 mod tests {
-    use surf::StatusCode;
+    use std::fs;
+
+    use surf::{Response, StatusCode};
 
     use crate::{
         config,
-        server::{start, CSRF_ID},
+        server::{self, start, CSRF_ID},
         user_manager::UserManager,
     };
 
     #[async_std::test]
     async fn test_get_login() {
         let uc = config::tests::make_test_config();
-        let _srv_task = start(&uc);
+        let srv_task = start(&uc).unwrap();
         let url = format!("http://localhost:{}/login", uc.port.unwrap());
+
         let resp = surf::get(&url).await;
+
         assert!(resp.is_ok());
         let resp = resp.unwrap();
         assert!(resp.status() == StatusCode::Ok);
-        let csrf_cookie = resp.header("Set-Cookie");
-        assert!(csrf_cookie.is_some());
 
-        let csrf_cookie = csrf_cookie.unwrap();
+        let csrf_token = get_csrf_token(&resp);
+        assert!(csrf_token.is_some());
+        let csrf_token = csrf_token.unwrap();
+
+        // test that sending the csrf doesn't generate a new set-cookie header
         let resp = surf::get(&url)
-            .header("Cookie", format!("{}={}", CSRF_ID, csrf_cookie))
+            .header("Cookie", format!("{}={}", CSRF_ID, csrf_token))
             .send()
             .await;
         assert!(resp.is_ok());
         let resp = resp.unwrap();
         assert!(resp.status() == StatusCode::Ok);
-        let csrf_cookie = resp.header("Set-Cookie");
-        assert!(csrf_cookie.is_none());
+        assert!(get_csrf_token(&resp).is_none());
+
+        srv_task.cancel().await;
     }
 
     #[async_std::test]
@@ -128,10 +135,11 @@ mod tests {
             .add_user(&String::from("test_user"), &String::from("test_password"))
             .unwrap();
 
-        let _srv_task = start(&uc);
+        let srv_task = start(&uc).unwrap();
 
         let url = format!("http://localhost:{}/login", uc.port.unwrap());
-        let csrf_cookie = get_csrf_token(&url).await;
+        let resp = surf::get(&url).await.unwrap();
+        let csrf_cookie = get_csrf_token(&resp).unwrap();
 
         let resp = surf::post(&url)
             .body_string(String::from("bad_user:bad_password"))
@@ -142,13 +150,13 @@ mod tests {
         assert!(resp.is_ok());
         let resp = resp.unwrap();
         assert!(resp.status() == StatusCode::UnprocessableEntity);
+        srv_task.cancel().await;
     }
 
-    async fn get_csrf_token(url: &str) -> String {
-        let resp = surf::get(url).await.unwrap();
-        let h = resp.header("Set-Cookie").unwrap().to_string();
+    fn get_csrf_token(resp: &Response) -> Option<String> {
+        let h = resp.header("Set-Cookie")?.to_string();
         // surely there is a better way?
-        let t = h[2..].split(";").nth(0).unwrap().split('=').nth(1).unwrap();
-        return t.to_string();
+        let t = h[2..].split(";").nth(0)?.split('=').nth(1)?;
+        return Some(t.to_string());
     }
 }
