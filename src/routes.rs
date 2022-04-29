@@ -15,16 +15,11 @@ impl Login {
             .body(state.login_form_html.to_owned())
             .content_type("text/html");
 
-        match req.cookie(CSRF_ID) {
-            Some(sess) => match state.csrf_manager.renew(&String::from(sess.value())) {
-                Some(_) => {}
-                None => {
-                    resp = Login::set_csrf(state, resp);
-                }
-            },
-            None => {
-                resp = Login::set_csrf(state, resp);
-            }
+        let c = req
+            .cookie(CSRF_ID)
+            .and_then(|c| state.csrf_manager.renew(&String::from(c.value())));
+        if c.is_none() {
+            resp = Login::set_csrf(state, resp);
         }
 
         return Ok(resp.build());
@@ -39,17 +34,16 @@ impl Login {
         let payload = req.body_string().await?;
         let state = req.state();
 
-        let csrf_token = match req.cookie(CSRF_ID) {
-            // exists but expired/bad
-            Some(csrf) if !state.csrf_manager.is_valid(csrf.value()) => {
-                return Ok(Response::new(StatusCode::NetworkAuthenticationRequired));
-            }
-            // exists and good
-            Some(c) => c,
-            // doesn't exist
-            None => {
-                return Ok(Response::new(StatusCode::NetworkAuthenticationRequired));
-            }
+        let csrf = req.cookie(CSRF_ID);
+
+        if csrf.is_none() {
+            return Ok(Response::new(StatusCode::NetworkAuthenticationRequired));
+        }
+
+        let csrf = csrf.unwrap();
+        let csrf = csrf.value();
+        if !state.csrf_manager.is_valid(csrf) {
+            return Ok(Response::new(StatusCode::NetworkAuthenticationRequired));
         };
 
         /* Using serde to deserialize this is like using a howitzer to hunt quail
@@ -67,7 +61,7 @@ impl Login {
             return Ok(Response::new(StatusCode::UnprocessableEntity));
         }
 
-        state.csrf_manager.remove(&String::from(csrf_token.value()));
+        state.csrf_manager.remove(&String::from(csrf));
         let sess_cookie = state.session_manager.create().to_string();
         let resp = Response::builder(StatusCode::Ok).header("Set-Cookie", sess_cookie).build();
 
